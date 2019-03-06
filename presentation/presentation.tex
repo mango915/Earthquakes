@@ -1,0 +1,233 @@
+% chktex-file 46
+%!TeX spellcheck = en-US,it-IT
+\documentclass{beamer}
+\usepackage[english]{babel}
+\usepackage{filecontents}
+\usepackage{eso-pic,graphicx}
+\usepackage[top=2cm, bottom=2cm, outer=0cm, inner=0cm]{geometry}
+\usepackage[absolute,overlay]{textpos}
+\begin{filecontents}{\jobname.bib}
+ @ARTICLE{paper,
+ author = {{Baldi}, P. and {Sadowski}, P. and {Whiteson}, D.},
+ title = "{Searching for exotic particles in high-energy physics with deep learning}",
+ journal = {Nature Communications},
+ year = 2014
+ }
+\end{filecontents}
+
+\usepackage[style=authortitle,backend=biber]{biblatex}
+\addbibresource{\jobname.bib}
+\usetheme{Padova}
+
+\title{Eathquakes}
+%\subtitle{Curabitur sit amet mi magna}
+\author{Nicola Dainese, Stefano Mancone, Francesco Vidaich}
+\date{03 Marzo 2019}
+\setbeamertemplate{caption}{\raggedright\insertcaption\par}
+\begin{document}
+
+\maketitle
+
+\section{Data exploration}
+\begin{frame}{Data exploration}
+ \begin{figure}
+  \centering
+  \includegraphics[width=.49\textwidth]{figures/IDvt.png}
+  \includegraphics[width=.49\textwidth]{figures/3Dxyz.png}\\
+ \end{figure}
+ \AddToShipoutPictureBG{\includegraphics[width=\paperwidth,height=0.08\paperheight]{bgWave.pdf}}
+\end{frame}
+
+\begin{frame}{Magnitude distribution}
+ \begin{figure}
+  \centering
+  \includegraphics[width=.7\textwidth]{figures/magn_d.png}\\  \end{figure}
+ \begin{itemize}
+  \item $f(m) = N_0 e ^ {-am}$
+        \begin{itemize}
+         \item{$N_0 = 1.1e7\pm$}
+         \item{$a = 2.23\pm$}
+        \end{itemize}
+  \item $\sigma_{bin} \approx 1/ \sqrt{N}$
+ \end{itemize}
+\end{frame}
+
+\begin{frame}{PCA analysis}
+ \begin{textblock*}{6.5cm}(0.5cm,1.5cm) % {block width} (coords)
+  \includegraphics[width=1\textwidth]{figures/PCA.png}\\
+ \end{textblock*}
+ \begin{textblock*}{5cm}(1.5cm,5cm) % {block width} (coords)
+  \includegraphics[width=1\textwidth]{figures/3Dplane.png}\\
+ \end{textblock*}
+ \begin{textblock*}{5cm}(7.5cm,5.3cm) % {block width} (coords)
+  \includegraphics[width=1\textwidth]{figures/heat_d.png}\\
+ \end{textblock*}
+\end{frame}
+
+
+
+
+
+
+
+
+
+
+
+
+
+\section{Data exploration}
+\begin{frame}{Data exploration}
+ \begin{itemize}
+  \item address a signal background discrimination problem with the deep
+        neural networks machine learning model.
+  \item use of high-performance computational techniques:
+        \begin{itemize}
+         \item cluster computing
+         \item hpc
+        \end{itemize}
+  \item inspired by \cite{paper} work, 2014.
+ \end{itemize}
+ \AddToShipoutPictureBG{\includegraphics[width=\paperwidth,height=0.08\paperheight]{bgWave.pdf}}
+\end{frame}
+\begin{frame}{The Higgs dataset}
+ \begin{textblock*}{8cm}(2cm,2cm) % {block width} (coords)
+  signal event
+ \end{textblock*}
+ \begin{textblock*}{8cm}(7.5cm,2cm) % {block width} (coords)
+  background event
+ \end{textblock*}
+ \begin{figure}[htpb]
+  \centering
+  \includegraphics[width=1\textwidth]{figures/decays.png}
+  \caption{the two $gg \rightarrow W^\mp W^\pm b \bar{b}$ processes}
+  \label{graphs}
+ \end{figure}
+ 
+ \begin{itemize}
+  \item semi-leptonic decay mode: $W_1 \rightarrow l\nu$, $W_2 \rightarrow jj $
+  \item final products: $l\nu bjjb$
+  \item $21$ low-level features, $7$ high-level features
+ \end{itemize}
+ \AddToShipoutPictureBG{\includegraphics[width=\paperwidth,height=0.08\paperheight]{bgWave.pdf}}
+ 
+\end{frame}
+
+\begin{frame}{Shallow vs Deep Neural Networks}
+ \begin{figure}[h]
+  %\begin{wrapfigure}{r}{0.33\textwidth} %this figure will be at the right
+  \centering
+  %    \includegraphics[width=0.25\textwidth]{mesh}
+  \includegraphics[scale=0.4]{figures/svsd.jpeg}
+  %\end{wrapfigure}
+ \end{figure}
+ \begin{columns}
+  \begin{column}{0.5\textwidth}
+   \begin{itemize}
+    \item one hidden layer
+    \item easier training
+   \end{itemize}
+  \end{column}
+  \begin{column}{0.5\textwidth}  %%<--- here
+   \begin{itemize}
+    \item several hidden layers
+    \item more complex fuctions
+   \end{itemize}
+  \end{column}
+ \end{columns}
+ 
+\end{frame}
+
+\begin{frame}{AUC comparison}
+ \small From~\cite{paper}
+ \begin{figure}
+  \centering
+  \includegraphics[width=.4\textwidth]{figures/SNp.png} \includegraphics[width=.4\textwidth]{figures/DNp.png}\\
+  \vspace{0.5cm}
+  \footnotesize \begin{tabular}{lccc}
+   \toprule
+   Discovery significance & Low level   & High level  & Complete    \\
+   \midrule
+   $\text{SNN}$           & $2.5\sigma$ & $3.1\sigma$ & $3.7\sigma$ \\
+   $\text{DNN}$           & $4.9\sigma$ & $3.6\sigma$ & $5.0\sigma$ \\
+   \bottomrule
+  \end{tabular}
+ \end{figure}
+\end{frame}
+
+\begin{frame}{Cluster and HPC}
+ \begin{columns}
+  \begin{column}{0.5\textwidth}
+   \begin{figure}[h]
+    \includegraphics[scale=0.035]{figures/cluster.JPG}
+    \includegraphics[scale=0.08]{figures/nvidia_logo.png}
+   \end{figure}
+  \end{column}
+  \begin{column}{0.5\textwidth}  %%<--- here
+   \begin{textblock*}{10cm}(6.5cm,2.2cm)
+    \footnotesize
+    Cluster:
+    \begin{itemize}
+     \item several machine nodes
+     \item introduce network issues
+     \item different programming logic
+    \end{itemize}
+    \vspace{2.4cm}
+    High performance computing with GPUs:
+    \begin{itemize}
+     \item much more (slower) cores than CPUs
+     \item well suited for parallel tasks
+    \end{itemize}
+   \end{textblock*}
+  \end{column}
+ \end{columns}
+\end{frame}
+
+
+\begin{frame}{Software utilized}
+ \begin{figure}[h]
+  %\begin{wrapfigure}{r}{0.33\textwidth} %this figure will be at the right
+  \centering
+  %    \includegraphics[width=0.25\textwidth]{mesh}
+  \includegraphics[scale=1]{figures/logos}
+  %\end{wrapfigure}
+ \end{figure}
+\end{frame}
+
+\begin{frame}{Performance comparison}
+ \begin{textblock*}{15cm}(-1cm,1cm)
+  \begin{figure}[h]
+   \includegraphics[scale=0.2103]{figures/absolute.png}
+   \includegraphics[scale=0.2103]{figures/relative.png}
+   \caption{Number of nodes versus execution time for $1$ epoch}
+   \label{1}
+  \end{figure}
+ \end{textblock*}
+ 
+ \begin{textblock*}{10cm}(1.5cm,6.2cm)
+  \begin{itemize}
+   \item as the number of nodes increases, the choice of the algorithm becomes less important
+   \item the bottleneck could be on the network side
+   \item GPUs are less performing than expected
+  \end{itemize}
+ \end{textblock*}
+\end{frame}
+
+\begin{frame}{Outlook}
+ These paradigms can give a significant boost to deep neural networks
+ training, further exploration could be:
+ \begin{itemize}
+  \item set up a GPUs cluster given their different network technology
+  \item work on network management to improve it
+ \end{itemize}
+\end{frame}
+
+\section{First section}
+
+\begin{frame}{$ $ }
+ \centering
+ \Huge Grazie per l'attenzione!
+\end{frame}
+
+
+\end{document}
