@@ -499,7 +499,7 @@ def WaitingTimePriveEvents(df, v_dict):
                 time_diff_tree[int(j)] = df['time'].iloc[int(j)] - df['time'].iloc[int(k)]
 
     time_diff_tree = time_diff_tree[time_diff_tree > 0]
-    p_tree, q_tree, p_tree_err, cut_time_tree = plot_powerlaw_hist(time_diff_tree, "Waiting times distribution for prime events", rescaling = False, density = False, cut_off = True)
+    p_tree, q_tree, p_tree_err, cut_time_tree = plot_powerlaw_hist(time_diff_tree, "Waiting times distribution for prime events", rescaling = False, density = False, cut_off = True, P0 = 4)
 
 
 def select_bin_number_mod(x, m = 2, min_nbin = 7, fraction = 0.001):
