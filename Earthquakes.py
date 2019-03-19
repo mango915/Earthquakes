@@ -526,9 +526,12 @@ def plot_powerlaw_hist_dist(x, suptitle, rescaling = False, density = False, sho
 
 
 def EsponentMagnitudePlot(ms1, p_time, p_t_errors):
+    p_mean = p_time.mean()
+    p_std = p_time.std()/np.sqrt(len(p_time))
     slope, intercept, r_value, p_value, std_err = stats.linregress(ms1, p_time)
     plt.errorbar(ms1, p_time, yerr = p_t_errors, fmt = '.r', label = 'estimated exponents \nwith errors' )
     plt.plot(ms1, intercept+slope*ms1, label = 'fit: p(m) = %.2fm%.2f'%(slope,intercept))
+    plt.axhline(p_mean, color = 'tab:orange', label = "Mean $<p>_m$ = %.2f $\pm$ %.2f"%(p_mean,p_std))
     plt.ylabel('exponent p', fontsize = 14)
     plt.xlabel('magnitude m', fontsize = 14)
     plt.title('Exponent dependence from magnitude', y=1.1, fontsize = 18)
@@ -550,7 +553,7 @@ def WaitingMagnitudePlot(ms1, cut_times):
     return predicted_cut_times
 
 
-def WaitingTimePriveEvents(df, v_dict):
+def WaitingTimeConsequentEvents(df, v_dict):
     N = df.shape[0]
     time_diff_tree = np.zeros(N)
     for d in range(len(v_dict)):
@@ -561,7 +564,7 @@ def WaitingTimePriveEvents(df, v_dict):
                 time_diff_tree[int(j)] = df['time'].iloc[int(j)] - df['time'].iloc[int(k)]
 
     time_diff_tree = time_diff_tree[time_diff_tree > 0]
-    p_tree, q_tree, p_tree_err, cut_time_tree = plot_powerlaw_hist(time_diff_tree, "Waiting times distribution for prime events", rescaling = False, density = False, cut_off = True, P0 = 4)
+    p_tree, q_tree, p_tree_err, cut_time_tree = plot_powerlaw_hist(time_diff_tree, "Waiting times distribution for consequent events", rescaling = False, density = False, cut_off = True, P0 = 4)
 
 
 def select_bin_number_mod(x, m = 2, min_nbin = 7, fraction = 0.001):
