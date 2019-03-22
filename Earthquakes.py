@@ -461,12 +461,77 @@ def plot_powerlaw_hist(x, suptitle, rescaling = False, density = False, show = T
         # returns the slope, the intercept and the error of the slope
         return p, q, np.sqrt(cov[0,0])
 
+def plot_powerlaw_hist_dist(x, suptitle, rescaling = False, density = False, show = True, **kwargs):
+
+    # compute automatically a suitable binning for x and all the associated quantities
+    bin_extremes, widths, centers, freq, weights, sigma_weights = binning(x, rescaling, density)
+    bin_number = len(centers)
+
+    if show:
+        fig, (ax1, ax2) = plt.subplots(nrows=1, ncols=2,figsize=(12, 5))
+
+        # we plot a single point for each bin with the weight being the probability density estimated for the center
+        # of the bin (see binning function)
+        ax1.hist(centers, bins = bin_extremes, weights = weights, histtype = 'step')
+        ax1.errorbar(centers, weights, sigma_weights, fmt = 'r.')
+        ax1.set_xscale('log')
+        ax1.set_yscale('log')
+        ax1.set_xlabel('distances [m]', fontsize = 14)
+        ax1.set_ylabel('occurrencies [a.u]', fontsize = 14)
+        ax1.set_title('Number of events = {}'.format(len(x)))
+
+    # now we need to fit the power law in the log-log space, eventually identifying the points before the cut-off
+    # this should work automatically both for the case rescaling = True or False (if True, x is in [0,1])
+    # and for the case density = True or False (if True, the area of the histogram is normalized to 1
+    # and the weights are rescaled so that np.sum(weights*bin_widths) = 1)
+    log_x = np.log(centers)
+    log_w = np.log(weights)
+
+    # the idea is to write a function that as a default just fits the (log_x,log_w) with a linear function
+    # log_w = p*log_x + q and has 2 flags: one for excluding skip_initial_pt points (set to 1 for default because
+    # the first bin is always problematic) and another one to signal that we expect a cut-off at the right side of the
+    # distribution (i.e. the tail) and we want to stop fitting just before the cut-off.
+    # we want as a return the parameters p and q with their covariance matrix (that is the default return of
+    # scipy curve_fit) and, if the cut_off flag is True, also the estimate cut-off (rescaled or not depending on the
+    # setting passed before)
+
+    if 'cut_off' in kwargs:
+        if kwargs['cut_off'] == True:
+             p, q, cov, log_x_cut, title = loglog_fitting(log_x, log_w, **kwargs)
+    else:
+        p, q, cov, x_cut, title = loglog_fitting(log_x, log_w, **kwargs)
+
+    if show:
+        y_errors = sigma_weights/weights
+
+        ax2.errorbar(log_x, log_w, yerr = y_errors ,fmt ='r.', label = 'entries with errors')
+        ax2.plot(log_x, linear_f(log_x, p, q),
+                 label = 'f(x) = px + q\np = {} \nq = {}'.format(round(p,1),round(q,1)))
+        ax2.legend()
+        ax2.set_xlabel('distances [logscale]', fontsize = 14)
+        ax2.set_ylabel('occurrencies [logscale]', fontsize = 14)
+        ax2.set_title(title)
+        fig.suptitle(suptitle, x=0.5, y=1, fontsize=18)
+        plt.show()
+
+    if 'cut_off' in kwargs:
+        if kwargs['cut_off'] == True:
+            if rescaling == True:
+                return p, q, np.sqrt(cov[0,0]), np.exp(log_x_cut)*x.max()
+            else:
+                return p, q, np.sqrt(cov[0,0]), np.exp(log_x_cut)
+    else:
+        # returns the slope, the intercept and the error of the slope
+        return p, q, np.sqrt(cov[0,0])
 
 
 def EsponentMagnitudePlot(ms1, p_time, p_t_errors):
+    p_mean = p_time.mean()
+    p_std = p_time.std()/np.sqrt(len(p_time))
     slope, intercept, r_value, p_value, std_err = stats.linregress(ms1, p_time)
     plt.errorbar(ms1, p_time, yerr = p_t_errors, fmt = '.r', label = 'estimated exponents \nwith errors' )
     plt.plot(ms1, intercept+slope*ms1, label = 'fit: p(m) = %.2fm%.2f'%(slope,intercept))
+    plt.axhline(p_mean, color = 'tab:orange', label = "Mean $<p>_m$ = %.2f $\pm$ %.2f"%(p_mean,p_std))
     plt.ylabel('exponent p', fontsize = 14)
     plt.xlabel('magnitude m', fontsize = 14)
     plt.title('Exponent dependence from magnitude', y=1.1, fontsize = 18)
@@ -488,7 +553,7 @@ def WaitingMagnitudePlot(ms1, cut_times):
     return predicted_cut_times
 
 
-def WaitingTimePriveEvents(df, v_dict):
+def WaitingTimeConsequentEvents(df, v_dict):
     N = df.shape[0]
     time_diff_tree = np.zeros(N)
     for d in range(len(v_dict)):
@@ -499,7 +564,7 @@ def WaitingTimePriveEvents(df, v_dict):
                 time_diff_tree[int(j)] = df['time'].iloc[int(j)] - df['time'].iloc[int(k)]
 
     time_diff_tree = time_diff_tree[time_diff_tree > 0]
-    p_tree, q_tree, p_tree_err, cut_time_tree = plot_powerlaw_hist(time_diff_tree, "Waiting times distribution for prime events", rescaling = False, density = False, cut_off = True, P0 = 4)
+    p_tree, q_tree, p_tree_err, cut_time_tree = plot_powerlaw_hist(time_diff_tree, "Waiting times distribution for consequent events", rescaling = False, density = False, cut_off = True, P0 = 4)
 
 
 def select_bin_number_mod(x, m = 2, min_nbin = 7, fraction = 0.001):
