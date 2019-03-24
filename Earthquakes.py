@@ -553,7 +553,7 @@ def WaitingMagnitudePlot(ms1, cut_times):
     plt.title('Waiting time cut-off vs magnitude', y=1.1, fontsize = 18)
     plt.legend()
     plt.show()
-    return predicted_cut_times
+    return predicted_cut_times, [slope, intercept]
 
 
 def WaitingTimeConsequentEvents(df, v_dict):
@@ -796,6 +796,84 @@ def RangeMagnitudePlot(ms, Rs, t_cutoff):
     plt.title("Range conditioned waiting time\n", fontsize = 18)
     plt.show()
 
+    
+
+def filtered_linear_fit(x, y):
+    # first linear fit, used to exclude from the final fit the points that are completely misalligned
+    preliminary_params, _ = optimize.curve_fit(linear_f, x, y)
+    # compute squared residues of each point
+    sq_residues = np.power(y - linear_f(x, *preliminary_params) ,2)
+    mean_sq_res = sq_residues.mean()
+    # if the sqaured residual of a point is greater than 3 times the mean squared residual the point is removed from
+    # the ones used for the final fit
+    mask = sq_residues < 3*mean_sq_res
+    x_filtered = x[mask]
+    y_filtered = y[mask]
+    # fit only of the alligned points (more or less)
+    params, _ = optimize.curve_fit(linear_f, x_filtered, y_filtered)
+    return params
+
+
+def Tcutoff_over_R_plots(t_cutoff, Rs, ms, trunc=4, show=True):
+    scaling_parameters = np.zeros((len(ms),2))
+    for i in range(len(ms)):
+        
+        # 'trunc' is the number of points that are excluded from the fit starting from the tail
+        Rs_trunc = Rs[:-trunc]
+        t_cut_trunc = t_cutoff[i][:-trunc]
+
+        # filtered fit between T_cutoff and Rs
+        params = filtered_linear_fit(np.log(Rs_trunc), np.log(t_cut_trunc))
+        # IF slope is positive, remove first point until it becomes negative, as it should be (any better solution?)
+        while(params[0]>0):
+            Rs_trunc = Rs_trunc[1:]
+            t_cut_trunc = t_cut_trunc[1:]
+            params = filtered_linear_fit(np.log(Rs_trunc), np.log(t_cut_trunc))
+
+        scaling_parameters[i] = params
+        
+        if ( show==True ) or ( show==round(ms[i],1) ):
+            # plot the original points and the linear fit
+            plt.plot(Rs,t_cutoff[i], 'x', label = 'm = %.1f'%ms[i]) 
+            plt.plot(Rs_trunc, np.exp(linear_f(np.log(Rs_trunc), *params)) )
+
+            plt.xlabel('fraction of distance $R/R_{max}$', fontsize = 13)
+            plt.ylabel('Wating time cutoff [s]', fontsize = 13)
+            plt.title('Wating time cutoff vs $R/R_{max}$', fontsize = 16)
+            plt.yscale('log')
+            plt.xscale('log')
+            plt.legend()
+            plt.show()
+        elif i == len(Rs)-1:
+            print('Computed scaling parameters for every m fitting T_cutoff over Rs')
+    return scaling_parameters
+    
+    
+def Tcutoff_over_m_plots(t_cutoff, Rs, ms, show=True):
+    scaling_parameters = np.zeros((len(ms),2))
+    for i in range(len(Rs)):
+        
+        # filtered fit between T_cutoff and Rs
+        params = filtered_linear_fit(ms, np.log(t_cutoff[:,i]))
+        scaling_parameters[i] = params
+
+        if show == True:
+            # plot the original points and the linear fit
+            plt.plot(ms,t_cutoff[:,i], 'x', label = '$R/R_{max}$ = %.2f'%Rs[i]) 
+            plt.plot(ms, np.exp(linear_f(ms, *params)) ) 
+
+            plt.xlabel('Magnitude m', fontsize = 13)
+            plt.ylabel('Wating time cutoff [s]', fontsize = 13)
+            plt.title('Wating time cutoff vs magnitude', fontsize = 16)
+            plt.yscale('log')
+            #plt.xscale('log')
+            plt.legend()
+            plt.show()
+        elif i == len(Rs)-1:
+            print('Computed scaling parameters for every R fitting T_cutoff over ms')
+    return scaling_parameters 
+   
+
 
 """
 def collapsed_distributions(x, rescaling = False, density = False, show = True, **kwargs):
@@ -909,3 +987,145 @@ def ScalingPlot(df, ms1, predicted_cut_times):
     plt.title('Time scaling plot', y=1.05, fontsize = 18)
     plt.legend()
     plt.show()
+
+    
+    
+def Compare_scaling_methods(ms_R, scaling_params_R, scaling_params_orig):
+    fig, (ax1, ax2) = plt.subplots(nrows=1, ncols=2,figsize=(14,5))
+   
+    # plot params of linear fit between t_cut and R/R_max for every m
+    """ TOGLIEREI, DAL GRAFICO DELLE ALPHA NON SI RICAVA NULLA
+    plt.plot(ms_r,scaling_params_R[:,0], 'x')
+    plt.xlabel('m')
+    plt.ylabel(r'$\alpha$ (m)')
+    plt.show()
+    """
+    # linear fit between beta and m (removing outliers)
+    params = filtered_linear_fit(ms_R, scaling_params_R[:,1])
+    ax1.plot(ms_R,scaling_params_R[:,1],'x')
+    ax1.plot(ms_R,linear_f(ms_R, *params), label = r'$\beta$ = %.2f + %.2f*m'%(params[0], params[1]))
+    ax2.set_title('Relation between coefficient $\beta$ and m')
+    ax1.set_xlabel('m')
+    ax1.set_ylabel(r'$\beta$ (m)')
+    ax1.legend()
+
+    # compare results with the ones obtained in point 2
+    ax2.plot(ms_R, np.exp(linear_f(ms_R, *scaling_params_orig)), label='$t_{cut}$ from point (2)')
+    ax2.plot(ms_R, np.exp(linear_f(ms_R, *params)), label=r'$t_{cut} = e^{\beta (m)}$')
+    ax2.set_title('Comparison of methods for computing cutoff')
+    ax2.set_xlabel('m')
+    ax2.set_ylabel('Predicted $t_{cut}$ for $R/R_{max} = 1$')
+    ax2.set_yscale('log')
+    ax2.legend()
+    plt.show()
+    
+
+def compute_every_rescaled_hist(df, Rs, ms, scaling_parameters, U, n=50):
+    extremes_rescaled = []
+    centers_rescaled = []
+    weights_rescaled = []
+    sigma_rescaled = []
+    widths_rescaled = []
+
+    for k in range(len(ms)):
+        m = ms[k]
+
+        # scaling parameters for m = 2 correspond to index 0 of the array
+        predicted_cut_times = np.exp(linear_f(np.log(Rs), *scaling_parameters[k])) 
+
+        # Rs are already defined, here we generate centers in the PCA plane
+        centers = np.dot(U, np.array([np.random.uniform(-3,4, n), np.random.uniform(-2,2, n), np.zeros(n)])).T
+        dfm = df[df['magnitude'] > m] 
+
+        X = dfm[['x','y','z']].values.T
+        X = X.astype("float64")
+        # centering and rescaling the coordinates
+        for i in range(3):
+            X[i] = (X[i] - X[i].mean())/X[i].std()
+
+        # Compute distances between the center and each event (for R condition)
+        distances = np.linalg.norm((X.T[:,np.newaxis,:] - centers[np.newaxis,:,:]), axis=2)
+        distances = distances / distances.max()
+        #print("Max distance : ", distances.max())
+        timem = np.array(dfm['time'])
+        timeM = np.tile(timem[:, np.newaxis], [1,n]).T
+
+        m_extremes_rescaled = []
+        m_centers_rescaled = []
+        m_weights_rescaled = []
+        m_sigma_rescaled = []
+
+        # Build hist with every event inside the radios R (removing some strange events with time)
+        for i in range(len(Rs)):
+            timeM_filtered = timeM[distances.T < Rs[i]]
+            time_d = (timeM_filtered[1:] - timeM_filtered[:-1])
+            time_d = time_d[time_d>0]
+
+            bin_extremes, widths, centers, freq, weights, sigma_weights = binning(time_d, rescaling = False, density = True, verbose = False)
+            
+            # Rescale every hist using the corresponding predicted cutoff time
+            m_extremes_rescaled.append( bin_extremes / predicted_cut_times[i] )
+            m_centers_rescaled.append( centers / predicted_cut_times[i] )
+            m_weights_rescaled.append( weights * predicted_cut_times[i] )
+            m_sigma_rescaled.append( sigma_weights * predicted_cut_times[i] )
+
+        # save results in matrixes (values for every m and every R)
+        extremes_rescaled.append(m_extremes_rescaled)
+        centers_rescaled.append(m_centers_rescaled)
+        weights_rescaled.append(m_weights_rescaled)
+        sigma_rescaled.append(m_sigma_rescaled)
+        
+    rescaled_hists_data = {'extremes' : extremes_rescaled,
+                           'centers'  : centers_rescaled,
+                           'weights'  : weights_rescaled,
+                           'sigmas'   : sigma_rescaled}
+    return rescaled_hists_data
+               
+            
+def ScalingPlot_single_R(hists_data, ms, Rs, R_fraction): 
+    # check if R/Rmax is a valid value
+    if (R_fraction >= 0) and (R_fraction <= 1):
+        R_index = np.argwhere(Rs >= R_fraction)[0,0] #taking the first R after the one specified in the function
+        
+        # for every value of m, plot hist with magnitude R/R_max in the same figure
+        plt.figure(figsize = (8,6))
+        for i in range(len(ms)):
+            plt.errorbar(hists_data['centers'][i][R_index], 
+                         hists_data['weights'][i][R_index], 
+                         yerr=hists_data['sigmas'][i][R_index], alpha = 0.9)
+
+        plt.xlabel('Rescaled waiting times '+r'$\tau$'+' [a.u.]',  fontsize = 16)
+        plt.ylabel('PDF of '+r'$\tau$', fontsize = 16)
+        plt.xscale('log')
+        plt.yscale('log')
+        plt.title('Time scaling plot for $R/R_{max}$ = %.2f'%Rs[R_index], y=1.05, fontsize = 18)
+        #plt.legend()
+        plt.show()
+        
+    else:
+        print('ERROR:\nThe value of R_fraction must be between 0 and 1')
+    
+    
+def ScalingPlot_single_m(hists_data, ms, Rs, m):
+    # check if m is a valid value
+    if (m >= 2) and (m <=4.5):
+        m_index = np.argwhere(np.round(ms,1) == m)[0,0]
+        
+        # for every value of R/R_max, plot hist with magnitude m in the same figure
+        plt.figure(figsize = (8,6))
+        for k in range(len(Rs)):
+            plt.errorbar(hists_data['centers'][m_index][k],
+                         hists_data['weights'][m_index][k],
+                         yerr=hists_data['sigmas'][m_index][k], alpha = 0.9)
+
+        plt.xlabel('Rescaled waiting times '+r'$\tau$'+' [a.u.]',  fontsize = 16)
+        plt.ylabel('PDF of '+r'$\tau$', fontsize = 16)
+        plt.xscale('log')
+        plt.yscale('log')
+        plt.title('Time scaling plot for m = %.1f'%m, y=1.05, fontsize = 18)
+        #plt.legend()
+        plt.show()
+     
+    else:
+        print('ERROR:\nThe value of m must be between 2 and 4.5, and it can contain at max 1 digit after the decimal point')
+        
