@@ -238,7 +238,7 @@ def EdgesDepthPlot(df):
     plt.show()
 
 
-def binning(x, rescaling = False, density = False):
+def binning(x, rescaling = False, density = False, verbose = True):
 
     """Binning for power laws distributions.
         x = entries generated from a power law."""
@@ -279,7 +279,8 @@ def binning(x, rescaling = False, density = False):
     # merging of the first two bins until we get that the first bin represents the max of the PDF
     # this is a useful option to regularize the first bin if we expect it to assume the highest value
     while weights[0] < weights[1]:
-        print('Merging first and second bins.')
+        if verbose == True: 
+            print('Merging first and second bins.')
         #this is done by removing the second extreme, thus the first bin becomes the one between 0 and 2
         bin_extremes = np.concatenate(([bin_extremes[0]], bin_extremes[2:] ))
         widths = bin_extremes[1:] - bin_extremes[:-1]
@@ -298,11 +299,13 @@ def binning(x, rescaling = False, density = False):
     # should enter in the while loop only in there is at least one bin without counts in it
 
     while flag == False:
-        print('Entered in the while loop.')
-        print('Original frequencies: ', freq)
+        if verbose == True:
+            print('Entered in the while loop.')
+            print('Original frequencies: ', freq)
         for i in range(1,len(freq)):
             if freq[i] == 0:
-                print('Merging bin {} (empty) with bin {}.'.format(i,i-1))
+                if verbose == True:
+                    print('Merging bin {} (empty) with bin {}.'.format(i,i-1))
                 # bin extremes should be of length len(freq) + 1
                 # notice that bin_extremes[i] corresponds to the right border of bin[i-1]
                 # bin_extremes[:i] excludes the bin_extreme[i] !
@@ -785,7 +788,8 @@ def RangeMagnitudePlot(ms, Rs, t_cutoff):
     m_index = ['%.1f'%m for m in ms]
     ax.set_xticklabels(m_index, rotation = 45)
     ax.set_xlabel('magnitude m [$T_w$]', fontsize = 16)
-    R_index = ['%.2f'%((i+1)/20) for i in range(len(Rs))]
+    #R_index = ['%.2f'%((i+1)/20) for i in range(len(Rs))]
+    R_index = ['%.2f'%r for r in Rs]
     ax.set_yticklabels(R_index, rotation = 0)
     ax.set_ylabel('fraction $R/R_{max}$', fontsize = 16)
     ax.figure.axes[-1].yaxis.label.set_size(18)
