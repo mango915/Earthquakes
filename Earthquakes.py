@@ -338,7 +338,7 @@ def binning(x, rescaling = False, density = False, verbose = True):
 def linear_f(x, p, q):
         return p*x+q
 
-def loglog_fitting(x, y, skip_initial_pt = 1, cut_off = False, P0 = 3 ):
+def loglog_fitting(x, y, skip_initial_pt = 1, cut_off = False, P0 = 3):
     from scipy import optimize
 
     # this is used because the first bin is always problematic: in the log space log(0) doesn't exist, but in the
@@ -401,10 +401,10 @@ def loglog_fitting(x, y, skip_initial_pt = 1, cut_off = False, P0 = 3 ):
         return p, q, cov, x_cut, 'Good points {} out of {}'.format(good_points, len(x))
 
 
-def plot_powerlaw_hist(x, suptitle, rescaling = False, density = False, show = True, **kwargs):
+def plot_powerlaw_hist(x, suptitle, rescaling = False, density = False, show = True, verbose = True, **kwargs):
 
     # compute automatically a suitable binning for x and all the associated quantities
-    bin_extremes, widths, centers, freq, weights, sigma_weights = binning(x, rescaling, density)
+    bin_extremes, widths, centers, freq, weights, sigma_weights = binning(x, rescaling, density, verbose)
     bin_number = len(centers)
 
     if show:
@@ -740,8 +740,8 @@ def ExpectedMagnitudePlot(pr_r_expected, pr_r_exp_err, pr_r_max, pr_ms):
     plt.show()
 
 
-def plot_PmR_t(df, m, U, Rs, n=100, **kwargs):
-    print('\nTime distribution for m = ', m, '\n')
+def plot_PmR_t(df, m, U, Rs, n=100, verbose=True, **kwargs):
+    print('\nAnalyzing time distribution for every r and m =', round(m,1))
     # waiting time for events of magnitude > m
     #Xp = np.dot(Vt,X) # last coordinate should be small
     #Xpp = np.dot(U, Xp)
@@ -755,8 +755,8 @@ def plot_PmR_t(df, m, U, Rs, n=100, **kwargs):
         X[i] = (X[i] - X[i].mean())/X[i].std()
 
     distances = np.linalg.norm((X.T[:,np.newaxis,:] - centers[np.newaxis,:,:]), axis=2)
+    #print("Max distance uning centered and rescaled coordinates: ", round(distances.max(),2))
     distances = distances / distances.max()
-    print("Max distance : ", distances.max())
     timem = np.array(dfm['time'])
     timeM = np.tile(timem[:, np.newaxis], [1,n]).T
 
@@ -775,7 +775,8 @@ def plot_PmR_t(df, m, U, Rs, n=100, **kwargs):
         time_d = (timeM_filtered[1:] - timeM_filtered[:-1])
         time_d = time_d[time_d>0]
 
-        p, q, p_err, cut_times = plot_powerlaw_hist(time_d, suptitle="boh", **kwargs )
+        title_plot = 'Powerlaw hist for m = %.1f and r = %.2f'%(m, Rs[i])
+        p, q, p_err, cut_times = plot_powerlaw_hist(time_d, suptitle=title_plot, verbose=verbose, **kwargs)
 
         ps.append(p); qs.append(q); p_errors.append(p_err), cut_off_times.append(cut_times)
 
@@ -994,8 +995,8 @@ def Compare_scaling_methods(ms_R, scaling_params_R, scaling_params_orig):
     fig, (ax1, ax2) = plt.subplots(nrows=1, ncols=2,figsize=(14,5))
    
     # plot params of linear fit between t_cut and R/R_max for every m
-    """ TOGLIEREI, DAL GRAFICO DELLE ALPHA NON SI RICAVA NULLA
-    plt.plot(ms_r,scaling_params_R[:,0], 'x')
+    """#TOGLIEREI, DAL GRAFICO DELLE ALPHA NON SI RICAVA NULLA
+    plt.plot(ms_R,scaling_params_R[:,0], 'x')
     plt.xlabel('m')
     plt.ylabel(r'$\alpha$ (m)')
     plt.show()
@@ -1014,7 +1015,7 @@ def Compare_scaling_methods(ms_R, scaling_params_R, scaling_params_orig):
     ax2.plot(ms_R, np.exp(linear_f(ms_R, *params)), label=r'$t_{cut} = e^{\beta (m)}$')
     ax2.set_title('Comparison of methods for computing cutoff')
     ax2.set_xlabel('m')
-    ax2.set_ylabel('Predicted $t_{cut}$ for $R/R_{max} = 1$')
+    ax2.set_ylabel('Predicted $t_{cut}$ for $r = 1$')
     ax2.set_yscale('log')
     ax2.legend()
     plt.show()
@@ -1080,7 +1081,8 @@ def compute_every_rescaled_hist(df, Rs, ms, scaling_parameters, U, n=50):
                            'weights'  : weights_rescaled,
                            'sigmas'   : sigma_rescaled}
     return rescaled_hists_data
-               
+         
+    
             
 def ScalingPlot_single_R(hists_data, ms, Rs, R_fraction): 
     # check if R/Rmax is a valid value
