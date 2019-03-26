@@ -238,7 +238,7 @@ def EdgesDepthPlot(df):
     plt.show()
 
 
-def binning(x, rescaling = False, density = False):
+def binning(x, rescaling = False, density = False, verbose = True):
 
     """Binning for power laws distributions.
         x = entries generated from a power law."""
@@ -279,7 +279,8 @@ def binning(x, rescaling = False, density = False):
     # merging of the first two bins until we get that the first bin represents the max of the PDF
     # this is a useful option to regularize the first bin if we expect it to assume the highest value
     while weights[0] < weights[1]:
-        print('Merging first and second bins.')
+        if verbose == True: 
+            print('Merging first and second bins.')
         #this is done by removing the second extreme, thus the first bin becomes the one between 0 and 2
         bin_extremes = np.concatenate(([bin_extremes[0]], bin_extremes[2:] ))
         widths = bin_extremes[1:] - bin_extremes[:-1]
@@ -298,11 +299,13 @@ def binning(x, rescaling = False, density = False):
     # should enter in the while loop only in there is at least one bin without counts in it
 
     while flag == False:
-        print('Entered in the while loop.')
-        print('Original frequencies: ', freq)
+        if verbose == True:
+            print('Entered in the while loop.')
+            print('Original frequencies: ', freq)
         for i in range(1,len(freq)):
             if freq[i] == 0:
-                print('Merging bin {} (empty) with bin {}.'.format(i,i-1))
+                if verbose == True:
+                    print('Merging bin {} (empty) with bin {}.'.format(i,i-1))
                 # bin extremes should be of length len(freq) + 1
                 # notice that bin_extremes[i] corresponds to the right border of bin[i-1]
                 # bin_extremes[:i] excludes the bin_extreme[i] !
@@ -335,7 +338,7 @@ def binning(x, rescaling = False, density = False):
 def linear_f(x, p, q):
         return p*x+q
 
-def loglog_fitting(x, y, skip_initial_pt = 1, cut_off = False, P0 = 3 ):
+def loglog_fitting(x, y, skip_initial_pt = 1, cut_off = False, P0 = 3):
     from scipy import optimize
 
     # this is used because the first bin is always problematic: in the log space log(0) doesn't exist, but in the
@@ -398,10 +401,10 @@ def loglog_fitting(x, y, skip_initial_pt = 1, cut_off = False, P0 = 3 ):
         return p, q, cov, x_cut, 'Good points {} out of {}'.format(good_points, len(x))
 
 
-def plot_powerlaw_hist(x, suptitle, rescaling = False, density = False, show = True, **kwargs):
+def plot_powerlaw_hist(x, suptitle, rescaling = False, density = False, show = True, verbose = True, **kwargs):
 
     # compute automatically a suitable binning for x and all the associated quantities
-    bin_extremes, widths, centers, freq, weights, sigma_weights = binning(x, rescaling, density)
+    bin_extremes, widths, centers, freq, weights, sigma_weights = binning(x, rescaling, density, verbose)
     bin_number = len(centers)
 
     if show:
@@ -461,12 +464,77 @@ def plot_powerlaw_hist(x, suptitle, rescaling = False, density = False, show = T
         # returns the slope, the intercept and the error of the slope
         return p, q, np.sqrt(cov[0,0])
 
+def plot_powerlaw_hist_dist(x, suptitle, rescaling = False, density = False, show = True, **kwargs):
+
+    # compute automatically a suitable binning for x and all the associated quantities
+    bin_extremes, widths, centers, freq, weights, sigma_weights = binning(x, rescaling, density)
+    bin_number = len(centers)
+
+    if show:
+        fig, (ax1, ax2) = plt.subplots(nrows=1, ncols=2,figsize=(12, 5))
+
+        # we plot a single point for each bin with the weight being the probability density estimated for the center
+        # of the bin (see binning function)
+        ax1.hist(centers, bins = bin_extremes, weights = weights, histtype = 'step')
+        ax1.errorbar(centers, weights, sigma_weights, fmt = 'r.')
+        ax1.set_xscale('log')
+        ax1.set_yscale('log')
+        ax1.set_xlabel('distances [m]', fontsize = 14)
+        ax1.set_ylabel('occurrencies [a.u]', fontsize = 14)
+        ax1.set_title('Number of events = {}'.format(len(x)))
+
+    # now we need to fit the power law in the log-log space, eventually identifying the points before the cut-off
+    # this should work automatically both for the case rescaling = True or False (if True, x is in [0,1])
+    # and for the case density = True or False (if True, the area of the histogram is normalized to 1
+    # and the weights are rescaled so that np.sum(weights*bin_widths) = 1)
+    log_x = np.log(centers)
+    log_w = np.log(weights)
+
+    # the idea is to write a function that as a default just fits the (log_x,log_w) with a linear function
+    # log_w = p*log_x + q and has 2 flags: one for excluding skip_initial_pt points (set to 1 for default because
+    # the first bin is always problematic) and another one to signal that we expect a cut-off at the right side of the
+    # distribution (i.e. the tail) and we want to stop fitting just before the cut-off.
+    # we want as a return the parameters p and q with their covariance matrix (that is the default return of
+    # scipy curve_fit) and, if the cut_off flag is True, also the estimate cut-off (rescaled or not depending on the
+    # setting passed before)
+
+    if 'cut_off' in kwargs:
+        if kwargs['cut_off'] == True:
+             p, q, cov, log_x_cut, title = loglog_fitting(log_x, log_w, **kwargs)
+    else:
+        p, q, cov, x_cut, title = loglog_fitting(log_x, log_w, **kwargs)
+
+    if show:
+        y_errors = sigma_weights/weights
+
+        ax2.errorbar(log_x, log_w, yerr = y_errors ,fmt ='r.', label = 'entries with errors')
+        ax2.plot(log_x, linear_f(log_x, p, q),
+                 label = 'f(x) = px + q\np = {} \nq = {}'.format(round(p,1),round(q,1)))
+        ax2.legend()
+        ax2.set_xlabel('distances [logscale]', fontsize = 14)
+        ax2.set_ylabel('occurrencies [logscale]', fontsize = 14)
+        ax2.set_title(title)
+        fig.suptitle(suptitle, x=0.5, y=1, fontsize=18)
+        plt.show()
+
+    if 'cut_off' in kwargs:
+        if kwargs['cut_off'] == True:
+            if rescaling == True:
+                return p, q, np.sqrt(cov[0,0]), np.exp(log_x_cut)*x.max()
+            else:
+                return p, q, np.sqrt(cov[0,0]), np.exp(log_x_cut)
+    else:
+        # returns the slope, the intercept and the error of the slope
+        return p, q, np.sqrt(cov[0,0])
 
 
 def EsponentMagnitudePlot(ms1, p_time, p_t_errors):
+    p_mean = p_time.mean()
+    p_std = p_time.std()/np.sqrt(len(p_time))
     slope, intercept, r_value, p_value, std_err = stats.linregress(ms1, p_time)
     plt.errorbar(ms1, p_time, yerr = p_t_errors, fmt = '.r', label = 'estimated exponents \nwith errors' )
     plt.plot(ms1, intercept+slope*ms1, label = 'fit: p(m) = %.2fm%.2f'%(slope,intercept))
+    plt.axhline(p_mean, color = 'tab:orange', label = "Mean $<p>_m$ = %.2f $\pm$ %.2f"%(p_mean,p_std))
     plt.ylabel('exponent p', fontsize = 14)
     plt.xlabel('magnitude m', fontsize = 14)
     plt.title('Exponent dependence from magnitude', y=1.1, fontsize = 18)
@@ -485,10 +553,10 @@ def WaitingMagnitudePlot(ms1, cut_times):
     plt.title('Waiting time cut-off vs magnitude', y=1.1, fontsize = 18)
     plt.legend()
     plt.show()
-    return predicted_cut_times
+    return predicted_cut_times, [slope, intercept]
 
 
-def WaitingTimePriveEvents(df, v_dict):
+def WaitingTimeConsequentEvents(df, v_dict):
     N = df.shape[0]
     time_diff_tree = np.zeros(N)
     for d in range(len(v_dict)):
@@ -499,7 +567,7 @@ def WaitingTimePriveEvents(df, v_dict):
                 time_diff_tree[int(j)] = df['time'].iloc[int(j)] - df['time'].iloc[int(k)]
 
     time_diff_tree = time_diff_tree[time_diff_tree > 0]
-    p_tree, q_tree, p_tree_err, cut_time_tree = plot_powerlaw_hist(time_diff_tree, "Waiting times distribution for prime events", rescaling = False, density = False, cut_off = True)
+    p_tree, q_tree, p_tree_err, cut_time_tree = plot_powerlaw_hist(time_diff_tree, "Waiting times distribution for consequent events", rescaling = False, density = False, cut_off = True, P0 = 4)
 
 
 def select_bin_number_mod(x, m = 2, min_nbin = 7, fraction = 0.001):
@@ -672,8 +740,8 @@ def ExpectedMagnitudePlot(pr_r_expected, pr_r_exp_err, pr_r_max, pr_ms):
     plt.show()
 
 
-def plot_PmR_t(df, m, U, Rs, n=100, **kwargs):
-    print('\nTime distribution for m = ', m, '\n')
+def plot_PmR_t(df, m, U, Rs, n=100, verbose=True, **kwargs):
+    print('\nAnalyzing time distribution for every r and m =', round(m,1))
     # waiting time for events of magnitude > m
     #Xp = np.dot(Vt,X) # last coordinate should be small
     #Xpp = np.dot(U, Xp)
@@ -687,8 +755,8 @@ def plot_PmR_t(df, m, U, Rs, n=100, **kwargs):
         X[i] = (X[i] - X[i].mean())/X[i].std()
 
     distances = np.linalg.norm((X.T[:,np.newaxis,:] - centers[np.newaxis,:,:]), axis=2)
+    #print("Max distance uning centered and rescaled coordinates: ", round(distances.max(),2))
     distances = distances / distances.max()
-    print("Max distance : ", distances.max())
     timem = np.array(dfm['time'])
     timeM = np.tile(timem[:, np.newaxis], [1,n]).T
 
@@ -707,7 +775,8 @@ def plot_PmR_t(df, m, U, Rs, n=100, **kwargs):
         time_d = (timeM_filtered[1:] - timeM_filtered[:-1])
         time_d = time_d[time_d>0]
 
-        p, q, p_err, cut_times = plot_powerlaw_hist(time_d, suptitle="boh", **kwargs )
+        title_plot = 'Powerlaw hist for m = %.1f and r = %.2f'%(m, Rs[i])
+        p, q, p_err, cut_times = plot_powerlaw_hist(time_d, suptitle=title_plot, verbose=verbose, **kwargs)
 
         ps.append(p); qs.append(q); p_errors.append(p_err), cut_off_times.append(cut_times)
 
@@ -720,12 +789,91 @@ def RangeMagnitudePlot(ms, Rs, t_cutoff):
     m_index = ['%.1f'%m for m in ms]
     ax.set_xticklabels(m_index, rotation = 45)
     ax.set_xlabel('magnitude m [$T_w$]', fontsize = 16)
-    R_index = ['%.2f'%((i+1)/20) for i in range(len(Rs))]
+    #R_index = ['%.2f'%((i+1)/20) for i in range(len(Rs))]
+    R_index = ['%.2f'%r for r in Rs]
     ax.set_yticklabels(R_index, rotation = 0)
     ax.set_ylabel('fraction $R/R_{max}$', fontsize = 16)
     ax.figure.axes[-1].yaxis.label.set_size(18)
     plt.title("Range conditioned waiting time\n", fontsize = 18)
     plt.show()
+
+    
+
+def filtered_linear_fit(x, y):
+    # first linear fit, used to exclude from the final fit the points that are completely misalligned
+    preliminary_params, _ = optimize.curve_fit(linear_f, x, y)
+    # compute squared residues of each point
+    sq_residues = np.power(y - linear_f(x, *preliminary_params) ,2)
+    mean_sq_res = sq_residues.mean()
+    # if the sqaured residual of a point is greater than 3 times the mean squared residual the point is removed from
+    # the ones used for the final fit
+    mask = sq_residues < 3*mean_sq_res
+    x_filtered = x[mask]
+    y_filtered = y[mask]
+    # fit only of the alligned points (more or less)
+    params, _ = optimize.curve_fit(linear_f, x_filtered, y_filtered)
+    return params
+
+
+def Tcutoff_over_R_plots(t_cutoff, Rs, ms, trunc=4, show=True):
+    scaling_parameters = np.zeros((len(ms),2))
+    for i in range(len(ms)):
+        
+        # 'trunc' is the number of points that are excluded from the fit starting from the tail
+        Rs_trunc = Rs[:-trunc]
+        t_cut_trunc = t_cutoff[i][:-trunc]
+
+        # filtered fit between T_cutoff and Rs
+        params = filtered_linear_fit(np.log(Rs_trunc), np.log(t_cut_trunc))
+        # IF slope is positive, remove first point until it becomes negative, as it should be (any better solution?)
+        while(params[0]>0):
+            Rs_trunc = Rs_trunc[1:]
+            t_cut_trunc = t_cut_trunc[1:]
+            params = filtered_linear_fit(np.log(Rs_trunc), np.log(t_cut_trunc))
+
+        scaling_parameters[i] = params
+        
+        if ( show==True ) or ( show==round(ms[i],1) ):
+            # plot the original points and the linear fit
+            plt.plot(Rs,t_cutoff[i], 'x', label = 'm = %.1f'%ms[i]) 
+            plt.plot(Rs_trunc, np.exp(linear_f(np.log(Rs_trunc), *params)) )
+
+            plt.xlabel('fraction of distance $R/R_{max}$', fontsize = 13)
+            plt.ylabel('Wating time cutoff [s]', fontsize = 13)
+            plt.title('Wating time cutoff vs $R/R_{max}$', fontsize = 16)
+            plt.yscale('log')
+            plt.xscale('log')
+            plt.legend()
+            plt.show()
+        elif i == len(Rs)-1:
+            print('Computed scaling parameters for every m fitting T_cutoff over Rs')
+    return scaling_parameters
+    
+    
+def Tcutoff_over_m_plots(t_cutoff, Rs, ms, show=True):
+    scaling_parameters = np.zeros((len(ms),2))
+    for i in range(len(Rs)):
+        
+        # filtered fit between T_cutoff and Rs
+        params = filtered_linear_fit(ms, np.log(t_cutoff[:,i]))
+        scaling_parameters[i] = params
+
+        if show == True:
+            # plot the original points and the linear fit
+            plt.plot(ms,t_cutoff[:,i], 'x', label = '$R/R_{max}$ = %.2f'%Rs[i]) 
+            plt.plot(ms, np.exp(linear_f(ms, *params)) ) 
+
+            plt.xlabel('Magnitude m', fontsize = 13)
+            plt.ylabel('Wating time cutoff [s]', fontsize = 13)
+            plt.title('Wating time cutoff vs magnitude', fontsize = 16)
+            plt.yscale('log')
+            #plt.xscale('log')
+            plt.legend()
+            plt.show()
+        elif i == len(Rs)-1:
+            print('Computed scaling parameters for every R fitting T_cutoff over ms')
+    return scaling_parameters 
+   
 
 
 """
@@ -840,3 +988,146 @@ def ScalingPlot(df, ms1, predicted_cut_times):
     plt.title('Time scaling plot', y=1.05, fontsize = 18)
     plt.legend()
     plt.show()
+
+    
+    
+def Compare_scaling_methods(ms_R, scaling_params_R, scaling_params_orig):
+    fig, (ax1, ax2) = plt.subplots(nrows=1, ncols=2,figsize=(14,5))
+   
+    # plot params of linear fit between t_cut and R/R_max for every m
+    """#TOGLIEREI, DAL GRAFICO DELLE ALPHA NON SI RICAVA NULLA
+    plt.plot(ms_R,scaling_params_R[:,0], 'x')
+    plt.xlabel('m')
+    plt.ylabel(r'$\alpha$ (m)')
+    plt.show()
+    """
+    # linear fit between beta and m (removing outliers)
+    params = filtered_linear_fit(ms_R, scaling_params_R[:,1])
+    ax1.plot(ms_R,scaling_params_R[:,1],'x')
+    ax1.plot(ms_R,linear_f(ms_R, *params), label = r'$\beta$ = %.2f + %.2f*m'%(params[0], params[1]))
+    ax2.set_title('Relation between coefficient $\beta$ and m')
+    ax1.set_xlabel('m')
+    ax1.set_ylabel(r'$\beta$ (m)')
+    ax1.legend()
+
+    # compare results with the ones obtained in point 2
+    ax2.plot(ms_R, np.exp(linear_f(ms_R, *scaling_params_orig)), label='$t_{cut}$ from point (2)')
+    ax2.plot(ms_R, np.exp(linear_f(ms_R, *params)), label=r'$t_{cut} = e^{\beta (m)}$')
+    ax2.set_title('Comparison of methods for computing cutoff')
+    ax2.set_xlabel('m')
+    ax2.set_ylabel('Predicted $t_{cut}$ for $r = 1$')
+    ax2.set_yscale('log')
+    ax2.legend()
+    plt.show()
+    
+
+def compute_every_rescaled_hist(df, Rs, ms, scaling_parameters, U, n=50):
+    extremes_rescaled = []
+    centers_rescaled = []
+    weights_rescaled = []
+    sigma_rescaled = []
+    widths_rescaled = []
+
+    for k in range(len(ms)):
+        m = ms[k]
+
+        # scaling parameters for m = 2 correspond to index 0 of the array
+        predicted_cut_times = np.exp(linear_f(np.log(Rs), *scaling_parameters[k])) 
+
+        # Rs are already defined, here we generate centers in the PCA plane
+        centers = np.dot(U, np.array([np.random.uniform(-3,4, n), np.random.uniform(-2,2, n), np.zeros(n)])).T
+        dfm = df[df['magnitude'] > m] 
+
+        X = dfm[['x','y','z']].values.T
+        X = X.astype("float64")
+        # centering and rescaling the coordinates
+        for i in range(3):
+            X[i] = (X[i] - X[i].mean())/X[i].std()
+
+        # Compute distances between the center and each event (for R condition)
+        distances = np.linalg.norm((X.T[:,np.newaxis,:] - centers[np.newaxis,:,:]), axis=2)
+        distances = distances / distances.max()
+        #print("Max distance : ", distances.max())
+        timem = np.array(dfm['time'])
+        timeM = np.tile(timem[:, np.newaxis], [1,n]).T
+
+        m_extremes_rescaled = []
+        m_centers_rescaled = []
+        m_weights_rescaled = []
+        m_sigma_rescaled = []
+
+        # Build hist with every event inside the radios R (removing some strange events with time)
+        for i in range(len(Rs)):
+            timeM_filtered = timeM[distances.T < Rs[i]]
+            time_d = (timeM_filtered[1:] - timeM_filtered[:-1])
+            time_d = time_d[time_d>0]
+
+            bin_extremes, widths, centers, freq, weights, sigma_weights = binning(time_d, rescaling = False, density = True, verbose = False)
+            
+            # Rescale every hist using the corresponding predicted cutoff time
+            m_extremes_rescaled.append( bin_extremes / predicted_cut_times[i] )
+            m_centers_rescaled.append( centers / predicted_cut_times[i] )
+            m_weights_rescaled.append( weights * predicted_cut_times[i] )
+            m_sigma_rescaled.append( sigma_weights * predicted_cut_times[i] )
+
+        # save results in matrixes (values for every m and every R)
+        extremes_rescaled.append(m_extremes_rescaled)
+        centers_rescaled.append(m_centers_rescaled)
+        weights_rescaled.append(m_weights_rescaled)
+        sigma_rescaled.append(m_sigma_rescaled)
+        
+    rescaled_hists_data = {'extremes' : extremes_rescaled,
+                           'centers'  : centers_rescaled,
+                           'weights'  : weights_rescaled,
+                           'sigmas'   : sigma_rescaled}
+    return rescaled_hists_data
+         
+    
+            
+def ScalingPlot_single_R(hists_data, ms, Rs, R_fraction): 
+    # check if R/Rmax is a valid value
+    if (R_fraction >= 0) and (R_fraction <= 1):
+        R_index = np.argwhere(Rs >= R_fraction)[0,0] #taking the first R after the one specified in the function
+        
+        # for every value of m, plot hist with magnitude R/R_max in the same figure
+        plt.figure(figsize = (8,6))
+        for i in range(len(ms)):
+            plt.errorbar(hists_data['centers'][i][R_index], 
+                         hists_data['weights'][i][R_index], 
+                         yerr=hists_data['sigmas'][i][R_index], alpha = 0.9)
+
+        plt.xlabel('Rescaled waiting times '+r'$\tau$'+' [a.u.]',  fontsize = 16)
+        plt.ylabel('PDF of '+r'$\tau$', fontsize = 16)
+        plt.xscale('log')
+        plt.yscale('log')
+        plt.title('Time scaling plot for $R/R_{max}$ = %.2f'%Rs[R_index], y=1.05, fontsize = 18)
+        #plt.legend()
+        plt.show()
+        
+    else:
+        print('ERROR:\nThe value of R_fraction must be between 0 and 1')
+    
+    
+def ScalingPlot_single_m(hists_data, ms, Rs, m):
+    # check if m is a valid value
+    if (m >= 2) and (m <=4.5):
+        m_index = np.argwhere(np.round(ms,1) == m)[0,0]
+        
+        # for every value of R/R_max, plot hist with magnitude m in the same figure
+        plt.figure(figsize = (8,6))
+        for k in range(len(Rs)):
+            plt.errorbar(hists_data['centers'][m_index][k],
+                         hists_data['weights'][m_index][k],
+                         yerr=hists_data['sigmas'][m_index][k], alpha = 0.9)
+
+        plt.xlabel('Rescaled waiting times '+r'$\tau$'+' [a.u.]',  fontsize = 16)
+        plt.ylabel('PDF of '+r'$\tau$', fontsize = 16)
+        plt.xscale('log')
+        plt.yscale('log')
+        plt.title('Time scaling plot for m = %.1f'%m, y=1.05, fontsize = 18)
+        #plt.legend()
+        plt.show()
+     
+    else:
+        print('ERROR:\nThe value of m must be between 2 and 4.5, and it can contain at max 1 digit after the decimal point')
+        
