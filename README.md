@@ -1,1 +1,2 @@
-Earthquakes
+Watch in the Earthquakes notebook
+
